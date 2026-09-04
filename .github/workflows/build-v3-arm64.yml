@@ -1,0 +1,71 @@
+name: Build LSFG-VK v3 ARM64
+
+on:
+  push:
+    branches: [v3-upstream-arm64]
+    paths:
+      - '.github/workflows/build-v3-arm64.yml'
+      - 'scripts/build-v3-upstream.sh'
+      - 'plugin/py_modules/**'
+      - 'plugin/plugin.json'
+      - 'plugin/dist/index.js'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-v3:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout Odin 3 integration
+        uses: actions/checkout@v4
+        with:
+          ref: v3-upstream-arm64
+          fetch-depth: 0
+
+      - name: Install native ARM64 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build git pkg-config python3 \
+            libvulkan-dev vulkan-tools libwayland-dev libx11-dev libx11-xcb-dev \
+            libxcb1-dev libxkbcommon-dev libdrm-dev zip
+
+      - name: Build official upstream and assemble v3
+        run: |
+          chmod +x scripts/build-v3-upstream.sh
+          scripts/build-v3-upstream.sh
+
+      - name: Verify AArch64 payload
+        run: |
+          set -euxo pipefail
+          file plugin/bin/arm64-v3/liblsfg-vk-layer.so
+          readelf -h plugin/bin/arm64-v3/liblsfg-vk-layer.so | grep -E 'Machine:.*AArch64'
+          test -s plugin/bin/arm64-v3/VkLayer_LSFGVK_frame_generation.json
+          test -s plugin/bin/arm64-v3/UPSTREAM_BUILD_INFO.txt
+          test -s releases/LSFG-VK-3-ARM64-Odin3.zip
+          sha256sum releases/LSFG-VK-3-ARM64-Odin3.zip
+
+      - name: Upload installable v3
+        uses: actions/upload-artifact@v4
+        with:
+          name: LSFG-VK-3-ARM64-Odin3
+          path: |
+            releases/LSFG-VK-3-ARM64-Odin3.zip
+            releases/LSFG-VK-3-ARM64-Odin3.zip.sha256
+            plugin/bin/arm64-v3/UPSTREAM_BUILD_INFO.txt
+
+      - name: Commit validated ARM64 payload
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add plugin/bin/arm64-v3 releases/LSFG-VK-3-ARM64-Odin3.zip releases/LSFG-VK-3-ARM64-Odin3.zip.sha256
+          if git diff --cached --quiet; then
+            echo 'No generated payload changes.'
+            exit 0
+          fi
+          UPSTREAM_SHA="$(sed -n 's/^upstream_commit=//p' plugin/bin/arm64-v3/UPSTREAM_BUILD_INFO.txt)"
+          git commit -m "build(v3): ARM64 upstream ${UPSTREAM_SHA:0:12}"
+          git push origin HEAD:v3-upstream-arm64
