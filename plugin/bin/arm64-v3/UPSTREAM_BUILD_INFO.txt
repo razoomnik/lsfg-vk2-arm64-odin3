@@ -1,8 +1,8 @@
 variant=LSFG-VK-3-ARM64-Odin3
 upstream_url=https://git.lsfg-vk.dev/lsfg-vk.git
 upstream_ref=master
-upstream_commit=0ceed910d51f93155b052507cf4d7be661daaf04
-upstream_commit_date=2026-08-31T21:26:03+02:00
+upstream_commit=f58c34072939aadbc6eb8fb202d6aa262e5f4c64
+upstream_commit_date=2026-09-04T17:41:24+02:00
 build_arch=aarch64
 build_os=Linux
-adaptation=gcc13-vulkanhpp-explicit-extent2d
+adaptation=none
