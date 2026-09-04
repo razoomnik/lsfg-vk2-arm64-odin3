@@ -20,8 +20,30 @@ git clone --filter=blob:none "$UPSTREAM_URL" "$SRC"
 git -C "$SRC" checkout "$UPSTREAM_REF"
 UPSTREAM_SHA="$(git -C "$SRC" rev-parse HEAD)"
 UPSTREAM_DATE="$(git -C "$SRC" show -s --format=%cI HEAD)"
+PATCH_APPLIED="none"
 
 echo "Upstream: $UPSTREAM_SHA ($UPSTREAM_DATE)"
+
+# GCC 13 + the bundled Vulkan-Hpp sees brace assignment to vk::Extent2D as
+# ambiguous (VkExtent2D vs vk::Extent2D). This does not change runtime logic;
+# it only makes the type explicit. Apply only when the exact upstream line is
+# present, and record it in build metadata.
+HOOKS="$SRC/lsfg-vk-layer/src/hooks.cpp"
+if grep -Fq 'this->m_extent = { info.imageExtent.width, info.imageExtent.height };' "$HOOKS"; then
+  python3 - "$HOOKS" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text(encoding="utf-8")
+old = 'this->m_extent = { info.imageExtent.width, info.imageExtent.height };'
+new = 'this->m_extent = vk::Extent2D{ info.imageExtent.width, info.imageExtent.height };'
+if old not in s:
+    raise SystemExit("expected Extent2D source line disappeared")
+p.write_text(s.replace(old, new, 1), encoding="utf-8")
+PY
+  PATCH_APPLIED="gcc13-vulkanhpp-explicit-extent2d"
+  echo "Applied build-only compiler compatibility fix: $PATCH_APPLIED"
+fi
 
 echo "== Configure native AArch64 build =="
 MACHINE="$(uname -m)"
@@ -30,8 +52,6 @@ if [[ "$MACHINE" != "aarch64" && "$MACHINE" != "arm64" ]]; then
   exit 2
 fi
 
-# Current upstream uses LSFGVK_BUILD_LAYER. Older v2 snapshots used
-# LSFGVK_BUILD_VK_LAYER, so set both. UI stays off; CLI is optional.
 cmake -S "$SRC" -B "$BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$STAGE" \
@@ -94,6 +114,7 @@ upstream_commit=$UPSTREAM_SHA
 upstream_commit_date=$UPSTREAM_DATE
 build_arch=$(uname -m)
 build_os=$(uname -s)
+adaptation=$PATCH_APPLIED
 EOF
 
 file "$BUNDLE/liblsfg-vk-layer.so"
@@ -106,15 +127,10 @@ PKG="$TMP/decky-lsfg-vk3-arm64"
 mkdir -p "$PKG"
 cp -a "$ROOT/plugin/." "$PKG/"
 
-# Reuse the proven installer slot name inside the package, but replace its
-# payload with the freshly built official-upstream AArch64 layer.
 rm -rf "$PKG/bin/arm64-hot1x"
 mkdir -p "$PKG/bin/arm64-hot1x"
 cp -a "$BUNDLE/." "$PKG/bin/arm64-hot1x/"
 
-# Transform only the generated v3 package. The checked-in v2 source and every
-# installed v2 path remain untouched. This is what makes rollback a one-digit
-# edit in Steam: lsfg-vk2-arm64 <-> lsfg-vk3-arm64.
 python3 - "$PKG" <<'PY'
 from pathlib import Path
 import sys
@@ -125,7 +141,6 @@ replacements = [
     ("lsfg-vk2-arm64", "lsfg-vk3-arm64"),
     ("LSFG-VK 2 ARM64", "LSFG-VK 3 ARM64"),
     ("lsfg-vk 2 ARM64", "lsfg-vk 3 ARM64"),
-    ("LSFG-VK 2 ARM64 Hot-1X", "LSFG-VK 3 ARM64 upstream"),
 ]
 
 for path in root.rglob("*"):
@@ -159,7 +174,6 @@ PY
 find "$PKG" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$PKG" -type f -name '*.pyc' -delete
 
-# Sanity-check package identity and the exact launch option before zipping.
 grep -q 'LSFG-VK 3 ARM64' "$PKG/plugin.json"
 grep -q 'lsfg-vk3-arm64 %command%' "$PKG/py_modules/lsfg_vk/plugin.py"
 grep -q 'decky-lsfg-vk3-arm64' "$PKG/py_modules/lsfg_vk/constants.py"
