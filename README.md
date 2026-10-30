@@ -11,11 +11,11 @@ The plugin is based on the upstream `decky-lsfg-vk` project and the development 
 
 ## Download
 
-The ready-to-install Decky ZIP is committed under:
+Download the ZIP and matching SHA-256 file from [GitHub Releases](https://github.com/razoomnik/lsfg-vk2-arm64-odin3/releases).
 
-```text
-releases/LSFG-VK-2-ARM64-Hot1X-Odin3-v0.13.0.zip
-```
+Every push to `main` builds and validates the current plugin, then publishes a uniquely tagged **pre-release** (`main-<run>-<commit>`). These automatic builds do not replace the historical stable release and have not necessarily been tested on a device. A manual run is also available under **Actions → Build and release Decky ZIP → Run workflow** (select `main`).
+
+The archive in the repository's `releases/` directory is the historical v0.13.0 package. It is not the current auto-build; use the Release assets above.
 
 Install it through:
 
@@ -68,7 +68,9 @@ The script installs temporary build dependencies into the writable `/usr` overla
 ./scripts/build-plugin-zip.sh
 ```
 
-The resulting file is written to `releases/` with a SHA-256 file.
+The resulting file is written to `releases/` with a portable SHA-256 file. The filename is derived from `plugin/package.json`. Set `OUT_DIR` to choose another output directory.
+
+The workflow packages the checked-in ARM64 Vulkan binary and readable frontend bundle; it does not rebuild the Vulkan engine or install the plugin on your device.
 
 ## Source notes
 

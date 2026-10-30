@@ -1,0 +1,56 @@
+name: Build and release Decky ZIP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decky-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check source syntax
+        run: |
+          bash -n scripts/build-plugin-zip.sh
+          node --check plugin/dist/index.js
+          python3 -m compileall -q plugin
+      - name: Build and validate archive
+        env:
+          OUT_DIR: ${{ runner.temp }}/decky-release
+        run: |
+          bash scripts/build-plugin-zip.sh
+          python3 scripts/validate-plugin-zip.py "$OUT_DIR"/*.zip
+          (cd "$OUT_DIR" && sha256sum --check *.sha256)
+      - name: Publish immutable automatic build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OUT_DIR: ${{ runner.temp }}/decky-release
+        run: |
+          set -euo pipefail
+          tag="main-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
+          printf 'Automatic Decky ZIP built from commit %s.\n\nIncludes the checked-in ARM64 Vulkan layer; this workflow validates packaging and syntax, not runtime behavior on Odin 3. Install manually through Decky. Historical stable releases are unchanged.\n' "$GITHUB_SHA" > "$RUNNER_TEMP/release-notes.md"
+          # A successful rerun must not silently overwrite an existing release.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; keeping its assets unchanged."
+          else
+            gh release create "$tag" "$OUT_DIR"/*.zip "$OUT_DIR"/*.sha256 \
+              --target "$GITHUB_SHA" --title "Odin 3 ARM64 auto-build $tag" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease --latest=false
+          fi
+          gh release view "$tag" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

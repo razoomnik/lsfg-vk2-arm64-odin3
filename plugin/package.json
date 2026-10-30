@@ -1,6 +1,6 @@
 {
   "name": "decky-lsfg-vk2-arm64",
-  "version": "0.13.0-odin3-arm64.8-hot1x",
+  "version": "0.13.0-odin3-arm64.9-hot1x",
   "description": "Self-contained patched lsfg-vk 2 ARM64 Hot-1X Decky plugin for AYN Odin 3 / Armada",
   "type": "module",
   "scripts": {
