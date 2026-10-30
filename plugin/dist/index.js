@@ -915,7 +915,7 @@ function TextInputModal({ title, description, defaultValue = "", okText = "OK", 
                     justifyContent: "flex-end",
                     gap: "8px",
                     marginTop: "16px"
-                }, "flow-children": "horizontal" },
+                }, "flow-children": "row" },
                 window.SP_REACT.createElement(DFL.DialogButton, { onClick: closeModal }, cancelText),
                 window.SP_REACT.createElement(DFL.DialogButton, { onClick: handleOK, disabled: !value.trim() }, okText)))));
 }
@@ -1166,7 +1166,7 @@ function ProfileManagement({ currentProfile, onProfileChange }) {
                         padding: "0",
                         margin: "0",
                         marginTop: "8px"
-                    }, "flow-children": "horizontal" },
+                    }, "flow-children": "row" },
                     window.SP_REACT.createElement(DFL.DialogButton, { style: {
                             height: "40px",
                             flex: 1,
@@ -1479,7 +1479,7 @@ function FpsMultiplierControl({ config, onConfigChange }) {
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center"
-            }, "flow-children": "horizontal" },
+            }, "flow-children": "row" },
             window.SP_REACT.createElement(DFL.DialogButton, { style: {
                     marginLeft: "0px",
                     height: "30px",
